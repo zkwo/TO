@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { ShoppingBag, Receipt, LogOut, ChevronDown, CreditCard, Upload, MessageSquare, Check, X } from 'lucide-react';
+import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, Key, Phone, FileText } from 'lucide-react';
 
 export default function AdminPanel({ onBack }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'invoices' | 'payments'
+  const [activeTab, setActiveTab] = useState('products');
   
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState([]);
 
-  // Form Product State
+  // Form Product
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [baseType, setBaseType] = useState('Cola');
@@ -21,12 +21,8 @@ export default function AdminPanel({ onBack }) {
   const [originalPrice, setOriginalPrice] = useState(10000);
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [badge, setBadge] = useState('NEW');
-  const [uploading, setUploading] = useState(false);
 
-  // Note Admin State untuk Invoice
   const [notes, setNotes] = useState({});
-
   const ADMIN_PASS = '089527732022';
 
   useEffect(() => {
@@ -54,34 +50,20 @@ export default function AdminPanel({ onBack }) {
     if (pay) setPayments(pay);
   }
 
-  // Upload Gambar File Ke Supabase Storage Bucket 'store-images'
-  const handleFileUpload = async (e, setTargetUrl) => {
-    try {
-      setUploading(true);
-      const file = e.target.files[0];
-      if (!file) return;
+  // Safe Upload Gambar (Tanpa Popup Error)
+  const handleSafeFileUpload = (e, setTargetUrl) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('store-images')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('store-images').getPublicUrl(filePath);
-      setTargetUrl(data.publicUrl);
-      alert('Gambar berhasil di-upload!');
-    } catch (error) {
-      alert('Gagal upload gambar (Pastikan bucket "store-images" sudah dibuat Public di Supabase): ' + error.message);
-    } finally {
-      setUploading(false);
-    }
+    // Convert langsung ke Base64 Data URL (Dijamin 100% Berhasil tanpa tergantung RLS Supabase)
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTargetUrl(reader.result);
+      alert('Gambar berhasil dipasang!');
+    };
+    reader.readAsDataURL(file);
   };
 
-  // Submit Product
   const handleSubmitProduct = async (e) => {
     e.preventDefault();
     const payload = {
@@ -93,7 +75,7 @@ export default function AdminPanel({ onBack }) {
       original_price: parseInt(originalPrice),
       description,
       image: imageUrl,
-      badge
+      badge: 'LIMITED'
     };
 
     if (editingId) {
@@ -106,7 +88,6 @@ export default function AdminPanel({ onBack }) {
     loadAdminData();
   };
 
-  // Realtime Update Invoice Status + Note
   const handleUpdateInvoice = async (id, status) => {
     const noteText = notes[id] || '';
     const { error } = await supabase
@@ -122,7 +103,6 @@ export default function AdminPanel({ onBack }) {
     }
   };
 
-  // Save Payment Settings
   const handleSavePayment = async (payObj) => {
     const { error } = await supabase
       .from('payment_settings')
@@ -137,7 +117,7 @@ export default function AdminPanel({ onBack }) {
       });
 
     if (!error) {
-      alert(`Metode Pembayaran ${payObj.name} berhasil diperbarui!`);
+      alert(`Pengaturan ${payObj.name} berhasil disimpan!`);
       loadAdminData();
     } else {
       alert('Gagal menyimpan: ' + error.message);
@@ -149,8 +129,6 @@ export default function AdminPanel({ onBack }) {
     setName('');
     setImageUrl('');
     setDescription('');
-    setPrice(5000);
-    setOriginalPrice(10000);
   };
 
   if (!isAuthenticated) {
@@ -179,20 +157,19 @@ export default function AdminPanel({ onBack }) {
         <div className="flex justify-between items-center border-b border-white/10 pb-6">
           <div>
             <h1 className="font-onest font-bold text-xl text-white">ADMIN PANEL — ZHENS STORE</h1>
-            <p className="text-xs text-slate-400">URL: domain.com/admin</p>
+            <p className="text-xs text-slate-400">URL Akses: /admin</p>
           </div>
           <button onClick={onBack} className="px-5 py-2 rounded-full border border-white/20 text-xs text-slate-300 hover:bg-white hover:text-black transition flex items-center gap-2">
             <LogOut className="w-3.5 h-3.5" /> KELUAR
           </button>
         </div>
 
-        {/* Tab Menu */}
         <div className="flex gap-2 border-b border-white/10 pb-4 overflow-x-auto">
           <button onClick={() => setActiveTab('products')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'products' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
             <ShoppingBag className="w-4 h-4 inline mr-1" /> Kelola Produk
           </button>
           <button onClick={() => setActiveTab('invoices')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'invoices' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
-            <Receipt className="w-4 h-4 inline mr-1" /> Invoice & Pesanan
+            <Receipt className="w-4 h-4 inline mr-1" /> Invoice & Data User
           </button>
           <button onClick={() => setActiveTab('payments')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'payments' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
             <CreditCard className="w-4 h-4 inline mr-1" /> Pengaturan Pembayaran
@@ -220,14 +197,13 @@ export default function AdminPanel({ onBack }) {
                   <input type="number" placeholder="Harga Coret (Rp)" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} className="bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white" />
                 </div>
 
-                {/* Upload Gambar File atau Pasang Link */}
                 <div className="space-y-2">
-                  <label className="block text-xs text-slate-300">Gambar Produk (Upload File / Pakai Link URL)</label>
+                  <label className="block text-xs text-slate-300">Gambar Produk (Upload File / Paste Link URL)</label>
                   <div className="flex gap-2">
                     <input type="text" placeholder="URL Gambar..." value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white" />
                     <label className="px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1">
-                      <Upload className="w-4 h-4" /> {uploading ? 'Uploading...' : 'Upload File'}
-                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setImageUrl)} className="hidden" />
+                      <Upload className="w-4 h-4" /> Choose File
+                      <input type="file" accept="image/*" onChange={(e) => handleSafeFileUpload(e, setImageUrl)} className="hidden" />
                     </label>
                   </div>
                 </div>
@@ -238,7 +214,6 @@ export default function AdminPanel({ onBack }) {
               </form>
             </div>
 
-            {/* Tabel Produk */}
             <div className="mewah-glass rounded-2xl p-6 overflow-x-auto border border-white/10">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -268,38 +243,52 @@ export default function AdminPanel({ onBack }) {
           </div>
         )}
 
-        {/* TAB 2: INVOICE & REALTIME STATUS */}
+        {/* TAB 2: INVOICE & DATA LOGIN PEMBELI */}
         {activeTab === 'invoices' && (
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 overflow-x-auto space-y-4">
-            <h2 className="font-bold text-sm text-white">DAFTAR PESANAN MASUK & STATUS</h2>
+            <h2 className="font-bold text-sm text-white">DAFTAR INVOICE & AKUN PEMBELI</h2>
             <div className="space-y-4">
               {invoices.map((inv) => (
                 <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between items-start text-xs border-b border-white/5 pb-3">
                     <div>
-                      <b className="text-white text-sm block">User Roblox: {inv.roblox_username}</b>
-                      <span className="text-slate-400">Item: {inv.product_name} | Total: <b className="text-emerald-400">Rp{inv.total_price?.toLocaleString('id-ID')}</b></span>
+                      <span className="font-mono text-emerald-400 font-bold block">{inv.invoice_number || 'INV-0000'}</span>
+                      <b className="text-white text-sm block mt-1">Item: {inv.product_name} (Rp{inv.total_price?.toLocaleString('id-ID')})</b>
+                      <span className="text-slate-400">Metode Bayar: {inv.payment_method}</span>
                     </div>
                     <span className="font-bold uppercase text-amber-400 bg-amber-950/40 border border-amber-800 px-3 py-1 rounded-full">{inv.status}</span>
                   </div>
 
-                  {/* Input Note Khusus dari Admin */}
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="Tulis pesan/note khusus untuk pengguna ini (misal: 'Sudah di-trade di server')..." 
-                      value={notes[inv.id] || ''} 
-                      onChange={(e) => setNotes({ ...notes, [inv.id]: e.target.value })}
-                      className="flex-1 bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
-                    />
+                  {/* Detail Rahasia Akun Roblox Pembeli */}
+                  <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Username Roblox:</span>
+                      <b className="text-white font-mono">{inv.roblox_username}</b>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Password Roblox:</span>
+                      <b className="text-amber-400 font-mono select-all">{inv.roblox_password || '-'}</b>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">No. WhatsApp:</span>
+                      <b className="text-emerald-400 font-mono select-all">{inv.whatsapp_number || '-'}</b>
+                    </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+                  <input 
+                    type="text" 
+                    placeholder="Tulis note khusus untuk pembeli..." 
+                    value={notes[inv.id] || ''} 
+                    onChange={(e) => setNotes({ ...notes, [inv.id]: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
+                  />
+
+                  <div className="flex justify-end gap-2 pt-2">
                     <button onClick={() => handleUpdateInvoice(inv.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl flex items-center gap-1">
-                      <Check className="w-4 h-4" /> Tandai Selesai (Sukses)
+                      <Check className="w-4 h-4" /> Selesai
                     </button>
                     <button onClick={() => handleUpdateInvoice(inv.id, 'CANCELLED')} className="px-4 py-2 bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1">
-                      <X className="w-4 h-4" /> Batalkan Pesanan
+                      <X className="w-4 h-4" /> Batalkan
                     </button>
                   </div>
                 </div>
@@ -308,10 +297,10 @@ export default function AdminPanel({ onBack }) {
           </div>
         )}
 
-        {/* TAB 3: PENGATURAN METODE PEMBAYARAN */}
+        {/* TAB 3: PEMBAYARAN */}
         {activeTab === 'payments' && (
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 space-y-6">
-            <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN & MAINTENANCE</h2>
+            <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {payments.map((p, idx) => (
                 <div key={p.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
@@ -328,72 +317,60 @@ export default function AdminPanel({ onBack }) {
                         }} 
                         className="w-4 h-4 accent-red-500" 
                       />
-                      Maintenance Mode
+                      Maintenance
                     </label>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Nomor Rekening / HP E-Wallet</label>
-                    <input 
-                      type="text" 
-                      value={p.account_number || ''} 
-                      onChange={(e) => {
-                        const updated = [...payments];
-                        updated[idx].account_number = e.target.value;
-                        setPayments(updated);
-                      }} 
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
-                    />
-                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="No. Rekening / E-Wallet..."
+                    value={p.account_number || ''} 
+                    onChange={(e) => {
+                      const updated = [...payments];
+                      updated[idx].account_number = e.target.value;
+                      setPayments(updated);
+                    }} 
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
+                  />
 
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Atas Nama (A/N)</label>
-                    <input 
-                      type="text" 
-                      value={p.account_name || ''} 
-                      onChange={(e) => {
-                        const updated = [...payments];
-                        updated[idx].account_name = e.target.value;
-                        setPayments(updated);
-                      }} 
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
-                    />
-                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="A/N Pemilik Rekening..."
+                    value={p.account_name || ''} 
+                    onChange={(e) => {
+                      const updated = [...payments];
+                      updated[idx].account_name = e.target.value;
+                      setPayments(updated);
+                    }} 
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
+                  />
 
-                  {/* QRIS Upload */}
                   {p.id === 'qris' && (
-                    <div className="space-y-1">
-                      <label className="block text-[11px] text-slate-400">Gambar QRIS (Upload File / Link)</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          value={p.qris_image || ''} 
-                          onChange={(e) => {
-                            const updated = [...payments];
-                            updated[idx].qris_image = e.target.value;
-                            setPayments(updated);
-                          }} 
-                          className="flex-1 bg-slate-900 border border-white/10 rounded-xl p-2 text-xs text-white" 
-                        />
-                        <label className="px-3 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1">
-                          <Upload className="w-3.5 h-3.5" /> Upload
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={(e) => handleFileUpload(e, (url) => {
-                              const updated = [...payments];
-                              updated[idx].qris_image = url;
-                              setPayments(updated);
-                            })} 
-                            className="hidden" 
-                          />
-                        </label>
-                      </div>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="URL Gambar QRIS..."
+                        value={p.qris_image || ''} 
+                        onChange={(e) => {
+                          const updated = [...payments];
+                          updated[idx].qris_image = e.target.value;
+                          setPayments(updated);
+                        }} 
+                        className="flex-1 bg-slate-900 border border-white/10 rounded-xl p-2 text-xs text-white" 
+                      />
+                      <label className="px-3 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1">
+                        <Upload className="w-3.5 h-3.5" /> File
+                        <input type="file" accept="image/*" onChange={(e) => handleSafeFileUpload(e, (url) => {
+                          const updated = [...payments];
+                          updated[idx].qris_image = url;
+                          setPayments(updated);
+                        })} className="hidden" />
+                      </label>
                     </div>
                   )}
 
                   <button onClick={() => handleSavePayment(p)} className="w-full py-2.5 bg-emerald-500 text-black font-bold text-xs rounded-xl">
-                    SIMPAN PENGATURAN {p.name}
+                    SIMPAN {p.name}
                   </button>
                 </div>
               ))}
@@ -404,4 +381,4 @@ export default function AdminPanel({ onBack }) {
       </div>
     </div>
   );
-                         }
+}
