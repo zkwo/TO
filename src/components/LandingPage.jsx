@@ -96,7 +96,7 @@ export default function LandingPage({ onOpenAdmin }) {
           <div className="relative z-10 space-y-4">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-slate-600/80 text-slate-200 text-xs font-bold">
               <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-              EVADE SUMMER EVENT 2026 STORE
+              EVADE SUMMER EVENT 2026
             </div>
             <h2 className="font-onest font-black text-3xl sm:text-5xl text-white leading-tight silver-text-glow">
               Beli Item Event Evade Summer 2026 Murah!
