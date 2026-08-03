@@ -153,7 +153,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-200 via-slate-400 to-white text-slate-950 flex items-center justify-center font-onest font-black text-xl shadow-[0_0_20px_rgba(255,255,255,0.4)]">
-              G
+              L
             </div>
             <div>
               <h1 className="font-onest font-bold text-lg text-white leading-none flex items-center gap-2">
