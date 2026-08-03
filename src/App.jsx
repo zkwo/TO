@@ -14,7 +14,9 @@ import {
   Key, 
   Phone, 
   FileText, 
-  AlertCircle 
+  AlertCircle,
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 
 const DEFAULT_PAYMENTS = [
@@ -37,10 +39,11 @@ export default function App() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [selectedPaymentId, setSelectedPaymentId] = useState('qris');
   
-  // Tracking State
+  // Tracking & Detail Modal State
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userInvoices, setUserInvoices] = useState([]);
+  const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState(null);
 
   useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname);
@@ -66,7 +69,6 @@ export default function App() {
       if (firstActive) setSelectedPaymentId(firstActive.id);
     } else {
       setPayments(DEFAULT_PAYMENTS);
-      setSelectedPaymentId('qris');
     }
   }
 
@@ -91,12 +93,12 @@ export default function App() {
 
     const selectedPay = payments.find(p => p.id === selectedPaymentId);
     if (!selectedPay || selectedPay.is_archived) {
-      alert('Metode pembayaran tidak valid atau disembunyikan!');
+      alert('Metode pembayaran tidak valid!');
       return;
     }
 
     if (selectedPay.is_maintenance) {
-      alert(`Metode pembayaran ${selectedPay.name} sedang maintenance. Silahkan pilih metode lain!`);
+      alert(`Metode pembayaran ${selectedPay.name} sedang maintenance. Pilih metode lain!`);
       return;
     }
 
@@ -116,7 +118,7 @@ export default function App() {
     ]);
 
     if (!error) {
-      alert(`Pesanan Berhasil dibuat!\nNomor Invoice: ${generatedInvoiceNo}\nCek status pesanan via Nomor WhatsApp atau No. Invoice.`);
+      alert(`Pesanan Berhasil dibuat!\nNomor Invoice: ${generatedInvoiceNo}\nCek status pesanan via No. Invoice di menu Cek Pesanan.`);
       setSearchQuery(generatedInvoiceNo);
       handleSearchInvoices(generatedInvoiceNo);
       setSelectedItem(null);
@@ -136,7 +138,6 @@ export default function App() {
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
-  // Filter hanya pembayaran yang TIDAK di-archive untuk Landing Page
   const visiblePayments = payments.filter(p => !p.is_archived);
   const selectedPaymentObj = visiblePayments.find(p => p.id === selectedPaymentId);
 
@@ -190,7 +191,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* Katalog Produk */}
+      {/* Katalog */}
       <section className="max-w-7xl mx-auto px-4 lg:px-8 mt-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="font-onest font-black text-2xl text-white tracking-wide">
@@ -258,7 +259,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Catatan Penting */}
               <div className="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl text-amber-200 text-xs space-y-1 font-sans">
                 <b className="font-bold text-amber-300 block flex items-center gap-1 text-[13px]">
                   <AlertCircle className="w-4 h-4 text-amber-400" /> 𝗖𝗮𝘁𝗮𝘁𝗮𝗻 𝗣𝗲𝗻𝘁𝗶𝗻𝗴:
@@ -271,7 +271,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Form Input Data Wajib */}
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Username Roblox</label>
@@ -293,7 +292,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pilihan Metode Pembayaran Aktif */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Metode Pembayaran</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -317,13 +315,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Petunjuk Pembayaran */}
               {selectedPaymentObj && (
                 <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 text-center space-y-2">
                   <span className="text-xs text-slate-400 font-mono">Petunjuk Bayar ({selectedPaymentObj.name}):</span>
                   {selectedPaymentObj.is_maintenance ? (
                     <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300">
-                      Metode pembayaran ini sedang maintenance. Silahkan pilih metode lain di atas.
+                      Metode pembayaran ini sedang maintenance.
                     </div>
                   ) : selectedPaymentObj.qris_image ? (
                     <div className="bg-white p-2 rounded-xl inline-block mx-auto">
@@ -347,13 +344,13 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL CEK INVOICE */}
+      {/* MODAL CEK INVOICE PESANAN + BISA KLIK DETAIL */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
           <div className="mewah-glass w-full max-w-lg rounded-3xl p-6 border border-white/20 max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center pb-4 border-b border-white/10">
               <h3 className="font-onest font-bold text-white text-base flex items-center gap-2">
-                <FileText className="w-5 h-5" /> Pelacakan Invoice & Status Pesanan
+                <FileText className="w-5 h-5" /> Pelacakan Invoice & Status
               </h3>
               <button onClick={() => setIsCartOpen(false)}><X className="w-5 h-5 text-slate-400" /></button>
             </div>
@@ -376,7 +373,11 @@ export default function App() {
                 <p className="text-center text-xs text-slate-500 py-8">Ketik Nomor WhatsApp atau Nomor Invoice di atas untuk mengecek status pesanan.</p>
               ) : (
                 userInvoices.map((inv) => (
-                  <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
+                  <div 
+                    key={inv.id} 
+                    onClick={() => setSelectedInvoiceDetail(inv)}
+                    className="p-4 bg-black/40 border border-white/10 hover:border-white/30 transition cursor-pointer rounded-2xl space-y-3"
+                  >
                     <div className="flex justify-between items-center text-xs">
                       <div>
                         <span className="font-mono text-emerald-400 font-bold block">{inv.invoice_number || 'INV-0000'}</span>
@@ -384,7 +385,7 @@ export default function App() {
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 ${
                         inv.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' :
-                        inv.status === 'CANCELLED' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                        inv.status === 'CANCELLED' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400 animate-pulse'
                       }`}>
                         {inv.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
                         {inv.status === 'CANCELLED' && <XCircle className="w-3 h-3" />}
@@ -393,24 +394,79 @@ export default function App() {
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex justify-between pt-1">
+                    <div className="text-[11px] text-slate-400 flex justify-between items-center pt-1 border-t border-white/5">
                       <span>Total: <b className="text-white">Rp{inv.total_price?.toLocaleString('id-ID')}</b></span>
-                      <span>Metode: {inv.payment_method}</span>
+                      <span className="text-white font-bold text-[10px] flex items-center gap-0.5">
+                        Lihat Detail Invoice <ChevronRight className="w-3 h-3 text-emerald-400" />
+                      </span>
                     </div>
-
-                    {inv.admin_note && (
-                      <div className="p-2.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 flex items-start gap-2 mt-2">
-                        <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <b className="block text-[10px] text-blue-300">Pesan dari Admin:</b>
-                          {inv.admin_note}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DETAIL LENGKAP INVOICE + NOTE ADMIN */}
+      {selectedInvoiceDetail && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4">
+          <div className="mewah-glass w-full max-w-md rounded-3xl p-6 border border-white/20 space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-white/10">
+              <div>
+                <span className="text-[10px] text-slate-400 block">INVOICE OFFICIAL</span>
+                <h3 className="font-mono font-black text-emerald-400 text-base">{selectedInvoiceDetail.invoice_number}</h3>
+              </div>
+              <button onClick={() => setSelectedInvoiceDetail(null)}><X className="w-5 h-5 text-slate-400" /></button>
+            </div>
+
+            <div className="p-3 bg-black/50 rounded-xl border border-white/10 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Produk:</span>
+                <b className="text-white">{selectedInvoiceDetail.product_name}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Harga:</span>
+                <b className="text-emerald-400">Rp{selectedInvoiceDetail.total_price?.toLocaleString('id-ID')}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Metode Pembayaran:</span>
+                <b className="text-white">{selectedInvoiceDetail.payment_method}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Status Transaksi:</span>
+                <b className={`uppercase ${selectedInvoiceDetail.status === 'COMPLETED' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {selectedInvoiceDetail.status}
+                </b>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl text-amber-200 text-xs space-y-1">
+              <b className="font-bold text-amber-300 block flex items-center gap-1 text-[12px]">
+                <AlertCircle className="w-4 h-4 text-amber-400" /> 𝗖𝗮𝘁𝗮𝘁𝗮𝗻 𝗣𝗲𝗻𝘁𝗶𝗻𝗴:
+              </b>
+              <p className="text-[11px] text-amber-100/90 leading-relaxed">
+                Perlu diingat bahwa, Admin tidak pernah mengganti data akun semacam hb (hackback) saat setelah transaksi berhasil dan data akun ditransfer.
+              </p>
+              <span className="italic text-[10px] font-serif text-amber-300 block pt-0.5">
+                𝘩𝘢𝘱𝘱𝘺 𝘴𝘩𝘰𝘱𝘱𝘪𝘯𝘨..
+              </span>
+            </div>
+
+            {selectedInvoiceDetail.admin_note ? (
+              <div className="p-3 bg-blue-950/50 border border-blue-500/30 rounded-2xl text-xs space-y-1 text-blue-200">
+                <b className="block text-blue-300 text-[11px] flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" /> Pesan Khusus Dari Admin:
+                </b>
+                <p className="text-slate-200">{selectedInvoiceDetail.admin_note}</p>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500 italic text-center">Belum ada catatan khusus dari Admin.</p>
+            )}
+
+            <button onClick={() => setSelectedInvoiceDetail(null)} className="w-full py-3 bg-white text-black font-bold text-xs rounded-xl">
+              TUTUP DETAIL
+            </button>
           </div>
         </div>
       )}
