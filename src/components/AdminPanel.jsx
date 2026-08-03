@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, Key, Phone, FileText } from 'lucide-react';
+import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, RefreshCw } from 'lucide-react';
+
+const DEFAULT_PAYMENTS = [
+  { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false },
+  { id: 'dana', name: 'DANA Instant', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
+  { id: 'gopay', name: 'GoPay', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
+  { id: 'bca', name: 'Transfer Bank BCA', account_number: '1234567890', account_name: 'Golrox Store', qris_image: '', is_maintenance: false }
+];
 
 export default function AdminPanel({ onBack }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -9,9 +16,9 @@ export default function AdminPanel({ onBack }) {
   
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [payments, setPayments] = useState([]);
+  const [payments, setPayments] = useState(DEFAULT_PAYMENTS);
 
-  // Form Product
+  // Form Product State
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [baseType, setBaseType] = useState('Cola');
@@ -47,15 +54,18 @@ export default function AdminPanel({ onBack }) {
     }
 
     const { data: pay } = await supabase.from('payment_settings').select('*');
-    if (pay) setPayments(pay);
+    if (pay && pay.length > 0) {
+      setPayments(pay);
+    } else {
+      setPayments(DEFAULT_PAYMENTS);
+    }
   }
 
-  // Safe Upload Gambar (Tanpa Popup Error)
+  // Safe File Upload (Base64)
   const handleSafeFileUpload = (e, setTargetUrl) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Convert langsung ke Base64 Data URL (Dijamin 100% Berhasil tanpa tergantung RLS Supabase)
     const reader = new FileReader();
     reader.onloadend = () => {
       setTargetUrl(reader.result);
@@ -117,7 +127,7 @@ export default function AdminPanel({ onBack }) {
       });
 
     if (!error) {
-      alert(`Pengaturan ${payObj.name} berhasil disimpan!`);
+      alert(`Metode Pembayaran ${payObj.name} berhasil disimpan!`);
       loadAdminData();
     } else {
       alert('Gagal menyimpan: ' + error.message);
@@ -143,7 +153,7 @@ export default function AdminPanel({ onBack }) {
             placeholder="Masukkan Password Admin"
             className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-white mb-4 focus:outline-none"
           />
-          <button onClick={handleLogin} className="w-full py-3 bg-white text-black font-bold text-xs rounded-xl">MASUK</button>
+          <button onClick={handleLogin} className="w-full py-3 bg-white text-black font-bold text-xs rounded-xl">MASUK PANEL</button>
           <button onClick={onBack} className="mt-4 text-xs text-slate-400 block mx-auto hover:underline">← Kembali ke Website</button>
         </div>
       </div>
@@ -164,6 +174,7 @@ export default function AdminPanel({ onBack }) {
           </button>
         </div>
 
+        {/* Tab Menu */}
         <div className="flex gap-2 border-b border-white/10 pb-4 overflow-x-auto">
           <button onClick={() => setActiveTab('products')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'products' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
             <ShoppingBag className="w-4 h-4 inline mr-1" /> Kelola Produk
@@ -202,7 +213,7 @@ export default function AdminPanel({ onBack }) {
                   <div className="flex gap-2">
                     <input type="text" placeholder="URL Gambar..." value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white" />
                     <label className="px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1">
-                      <Upload className="w-4 h-4" /> Choose File
+                      <Upload className="w-4 h-4" /> Upload
                       <input type="file" accept="image/*" onChange={(e) => handleSafeFileUpload(e, setImageUrl)} className="hidden" />
                     </label>
                   </div>
@@ -248,51 +259,54 @@ export default function AdminPanel({ onBack }) {
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 overflow-x-auto space-y-4">
             <h2 className="font-bold text-sm text-white">DAFTAR INVOICE & AKUN PEMBELI</h2>
             <div className="space-y-4">
-              {invoices.map((inv) => (
-                <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-start text-xs border-b border-white/5 pb-3">
-                    <div>
-                      <span className="font-mono text-emerald-400 font-bold block">{inv.invoice_number || 'INV-0000'}</span>
-                      <b className="text-white text-sm block mt-1">Item: {inv.product_name} (Rp{inv.total_price?.toLocaleString('id-ID')})</b>
-                      <span className="text-slate-400">Metode Bayar: {inv.payment_method}</span>
+              {invoices.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-6">Belum ada pesanan masuk.</p>
+              ) : (
+                invoices.map((inv) => (
+                  <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-start text-xs border-b border-white/5 pb-3">
+                      <div>
+                        <span className="font-mono text-emerald-400 font-bold block">{inv.invoice_number || 'INV-0000'}</span>
+                        <b className="text-white text-sm block mt-1">Item: {inv.product_name} (Rp{inv.total_price?.toLocaleString('id-ID')})</b>
+                        <span className="text-slate-400">Metode Bayar: {inv.payment_method}</span>
+                      </div>
+                      <span className="font-bold uppercase text-amber-400 bg-amber-950/40 border border-amber-800 px-3 py-1 rounded-full">{inv.status}</span>
                     </div>
-                    <span className="font-bold uppercase text-amber-400 bg-amber-950/40 border border-amber-800 px-3 py-1 rounded-full">{inv.status}</span>
-                  </div>
 
-                  {/* Detail Rahasia Akun Roblox Pembeli */}
-                  <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Username Roblox:</span>
-                      <b className="text-white font-mono">{inv.roblox_username}</b>
+                    <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">Username Roblox:</span>
+                        <b className="text-white font-mono">{inv.roblox_username}</b>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">Password Roblox:</span>
+                        <b className="text-amber-400 font-mono select-all">{inv.roblox_password || '-'}</b>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">No. WhatsApp:</span>
+                        <b className="text-emerald-400 font-mono select-all">{inv.whatsapp_number || '-'}</b>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Password Roblox:</span>
-                      <b className="text-amber-400 font-mono select-all">{inv.roblox_password || '-'}</b>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">No. WhatsApp:</span>
-                      <b className="text-emerald-400 font-mono select-all">{inv.whatsapp_number || '-'}</b>
+
+                    <input 
+                      type="text" 
+                      placeholder="Tulis note khusus untuk pembeli..." 
+                      value={notes[inv.id] || ''} 
+                      onChange={(e) => setNotes({ ...notes, [inv.id]: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
+                    />
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button onClick={() => handleUpdateInvoice(inv.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl flex items-center gap-1">
+                        <Check className="w-4 h-4" /> Tandai Selesai
+                      </button>
+                      <button onClick={() => handleUpdateInvoice(inv.id, 'CANCELLED')} className="px-4 py-2 bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1">
+                        <X className="w-4 h-4" /> Batalkan
+                      </button>
                     </div>
                   </div>
-
-                  <input 
-                    type="text" 
-                    placeholder="Tulis note khusus untuk pembeli..." 
-                    value={notes[inv.id] || ''} 
-                    onChange={(e) => setNotes({ ...notes, [inv.id]: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
-                  />
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button onClick={() => handleUpdateInvoice(inv.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl flex items-center gap-1">
-                      <Check className="w-4 h-4" /> Selesai
-                    </button>
-                    <button onClick={() => handleUpdateInvoice(inv.id, 'CANCELLED')} className="px-4 py-2 bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1">
-                      <X className="w-4 h-4" /> Batalkan
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -300,7 +314,19 @@ export default function AdminPanel({ onBack }) {
         {/* TAB 3: PEMBAYARAN */}
         {activeTab === 'payments' && (
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 space-y-6">
-            <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN</h2>
+              <button 
+                onClick={() => {
+                  payments.forEach(p => handleSavePayment(p));
+                  alert('Semua metode pembayaran di-sync ke Supabase!');
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white font-bold text-xs rounded-xl flex items-center gap-1"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Sync ke Supabase
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {payments.map((p, idx) => (
                 <div key={p.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
@@ -370,7 +396,7 @@ export default function AdminPanel({ onBack }) {
                   )}
 
                   <button onClick={() => handleSavePayment(p)} className="w-full py-2.5 bg-emerald-500 text-black font-bold text-xs rounded-xl">
-                    SIMPAN {p.name}
+                    SIMPAN PENGATURAN {p.name}
                   </button>
                 </div>
               ))}
@@ -381,4 +407,4 @@ export default function AdminPanel({ onBack }) {
       </div>
     </div>
   );
-}
+    }
