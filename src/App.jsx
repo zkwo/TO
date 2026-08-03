@@ -14,8 +14,10 @@ import {
   Clock,
   XCircle,
   MessageSquare,
-  AlertTriangle,
-  Search
+  Search,
+  Key,
+  Phone,
+  FileText
 } from 'lucide-react';
 
 export default function App() {
@@ -24,15 +26,18 @@ export default function App() {
   const [payments, setPayments] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // Form Order Input State
   const [robloxUsername, setRobloxUsername] = useState('');
+  const [robloxPassword, setRobloxPassword] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [selectedPaymentId, setSelectedPaymentId] = useState('');
   
-  // Modal State
+  // Cart / Tracking State
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [searchCartUser, setSearchCartUser] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // No WA atau No Invoice
   const [userInvoices, setUserInvoices] = useState([]);
 
-  // Routing Handler (/admin vs /)
   useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname);
     window.addEventListener('popstate', handlePopState);
@@ -58,21 +63,24 @@ export default function App() {
     }
   }
 
-  // Load Invoice untuk Modal Keranjang / Cek Status
-  async function handleSearchInvoices(username) {
-    if (!username.trim()) return;
+  // Cari Invoice menggunakan No WhatsApp ATAU No Invoice
+  async function handleSearchInvoices(query) {
+    if (!query.trim()) return;
+    const cleanQuery = query.trim();
+
     const { data } = await supabase
       .from('invoices')
       .select('*')
-      .ilike('roblox_username', username.trim())
+      .or(`whatsapp_number.ilike.%${cleanQuery}%,invoice_number.ilike.%${cleanQuery}%`)
       .order('created_at', { ascending: false });
+
     if (data) setUserInvoices(data);
   }
 
   // Handle Checkout
   const handleCheckout = async () => {
-    if (!robloxUsername.trim()) {
-      alert('Masukkan Username Roblox kamu!');
+    if (!robloxUsername.trim() || !robloxPassword.trim() || !whatsappNumber.trim()) {
+      alert('Wajib mengisi Username Roblox, Password Roblox, dan Nomor WhatsApp aktif!');
       return;
     }
 
@@ -82,9 +90,15 @@ export default function App() {
       return;
     }
 
+    // Generate Nomor Invoice Unik (misal: INV-87213)
+    const generatedInvoiceNo = 'INV-' + Math.floor(10000 + Math.random() * 90000);
+
     const { error } = await supabase.from('invoices').insert([
       {
+        invoice_number: generatedInvoiceNo,
         roblox_username: robloxUsername.trim(),
+        roblox_password: robloxPassword.trim(),
+        whatsapp_number: whatsappNumber.trim(),
         product_name: selectedItem.name,
         total_price: selectedItem.price,
         payment_method: selectedPay.name,
@@ -93,17 +107,18 @@ export default function App() {
     ]);
 
     if (!error) {
-      alert(`Pesanan ${selectedItem.name} berhasil dibuat! Kamu bisa cek status di menu Keranjang.`);
-      setSearchCartUser(robloxUsername);
-      handleSearchInvoices(robloxUsername);
+      alert(`Pesanan Berhasil dibuat!\nNomor Invoice Kamu: ${generatedInvoiceNo}\nSimpan No. Invoice atau gunakan No. WhatsApp untuk cek status.`);
+      setSearchQuery(generatedInvoiceNo);
+      handleSearchInvoices(generatedInvoiceNo);
       setSelectedItem(null);
-      setIsCartOpen(true); // Otomatis buka modal keranjang
+      setRobloxUsername('');
+      setRobloxPassword('');
+      setIsCartOpen(true);
     } else {
       alert('Gagal checkout: ' + error.message);
     }
   };
 
-  // 🔒 Halaman Admin Panel jika URL: domain.com/admin
   if (currentPath === '/admin') {
     return <AdminPanel onBack={() => { window.history.pushState({}, '', '/'); setCurrentPath('/'); }} />;
   }
@@ -121,7 +136,7 @@ export default function App() {
         <div className="orb orb-2 animate-float-2"></div>
       </div>
 
-      {/* Header / Navbar (TIDAK ADA TOMBOL ADMIN) */}
+      {/* Header */}
       <header className="sticky top-0 z-50 mewah-glass border-b border-white/10 px-4 lg:px-8 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -136,15 +151,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsCartOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-slate-100 to-white hover:brightness-110 rounded-xl shadow-md transition"
-            >
-              <ShoppingBag className="w-4 h-4 text-slate-900" />
-              <span>Cek Pesanan</span>
-            </button>
-          </div>
+          <button 
+            onClick={() => setIsCartOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-slate-100 to-white hover:brightness-110 rounded-xl shadow-md transition"
+          >
+            <ShoppingBag className="w-4 h-4 text-slate-900" />
+            <span>Cek Pesanan / Invoice</span>
+          </button>
         </div>
       </header>
 
@@ -160,13 +173,13 @@ export default function App() {
               Beli Item Event Evade Summer 2026 Murah!
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Transaksi kilat via Direct Trade Server, 100% legal, aman anti-ban dengan harga terjangkau.
+              Transaksi kilat via Direct Trade Server, 100% legal, aman anti-ban.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Katalog Produk */}
+      {/* Katalog */}
       <section className="max-w-7xl mx-auto px-4 lg:px-8 mt-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="font-onest font-black text-2xl text-white tracking-wide">
@@ -187,7 +200,6 @@ export default function App() {
                   <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/10 text-white uppercase">{p.badge}</span>
                   <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded">🫧 {p.tokens} Tokens</span>
                 </div>
-                {/* Fallback Gambar jika Link Error */}
                 <div className="w-full aspect-square rounded-xl bg-black/40 flex items-center justify-center p-3 mb-4 overflow-hidden">
                   <img 
                     src={p.image} 
@@ -215,12 +227,12 @@ export default function App() {
         </div>
       </section>
 
-      {/* MODAL CHECKOUT & PAYMENT */}
+      {/* MODAL CHECKOUT ORDER */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 overflow-y-auto">
           <div className="mewah-glass w-full max-w-md rounded-3xl p-6 border border-white/20 my-8">
             <div className="flex justify-between items-center pb-4 border-b border-white/10">
-              <h3 className="font-onest font-bold text-white text-base">Detail Pesanan & Pembayaran</h3>
+              <h3 className="font-onest font-bold text-white text-base">Detail Pesanan Topup</h3>
               <button onClick={() => setSelectedItem(null)}><X className="w-5 h-5 text-slate-400" /></button>
             </div>
 
@@ -233,18 +245,49 @@ export default function App() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Username Roblox</label>
-                <input 
-                  type="text" 
-                  value={robloxUsername} 
-                  onChange={(e) => setRobloxUsername(e.target.value)} 
-                  placeholder="Username Roblox kamu..." 
-                  className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs focus:outline-none focus:border-white" 
-                />
+              {/* Data Wajib Pembeli */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                    Username Roblox
+                  </label>
+                  <input 
+                    type="text" 
+                    value={robloxUsername} 
+                    onChange={(e) => setRobloxUsername(e.target.value)} 
+                    placeholder="Username Roblox..." 
+                    className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                    <Key className="w-3.5 h-3.5 text-amber-400" /> Password Roblox
+                  </label>
+                  <input 
+                    type="password" 
+                    value={robloxPassword} 
+                    onChange={(e) => setRobloxPassword(e.target.value)} 
+                    placeholder="Password Akun Roblox..." 
+                    className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" /> No. WhatsApp Aktif (Untuk Cek Invoice)
+                  </label>
+                  <input 
+                    type="text" 
+                    value={whatsappNumber} 
+                    onChange={(e) => setWhatsappNumber(e.target.value)} 
+                    placeholder="Contoh: 089527732022" 
+                    className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" 
+                  />
+                </div>
               </div>
 
-              {/* Pilihan Pembayaran + Maintenance Check */}
+              {/* Pilihan Metode Pembayaran */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Metode Pembayaran</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -268,11 +311,10 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Rincian QRIS / Nomor Rekening */}
+              {/* Rincian Petunjuk Pembayaran */}
               {selectedPaymentObj && !selectedPaymentObj.is_maintenance && (
                 <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 text-center space-y-2">
                   <span className="text-xs text-slate-400 font-mono">Petunjuk Bayar ({selectedPaymentObj.name}):</span>
-                  
                   {selectedPaymentObj.qris_image ? (
                     <div className="bg-white p-2 rounded-xl inline-block mx-auto">
                       <img src={selectedPaymentObj.qris_image} alt="QRIS" className="w-44 h-44 object-contain mx-auto" />
@@ -295,13 +337,13 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL KERANJANG / CEK STATUS PESANAN PENGGUNA */}
+      {/* MODAL CEK INVOICE (VIA NO WHATSAPP ATAU NO INVOICE) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
           <div className="mewah-glass w-full max-w-lg rounded-3xl p-6 border border-white/20 max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center pb-4 border-b border-white/10">
               <h3 className="font-onest font-bold text-white text-base flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5" /> Status Pesanan Kamu
+                <FileText className="w-5 h-5" /> Pelacakan Invoice & Status Pesanan
               </h3>
               <button onClick={() => setIsCartOpen(false)}><X className="w-5 h-5 text-slate-400" /></button>
             </div>
@@ -310,23 +352,26 @@ export default function App() {
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  value={searchCartUser} 
-                  onChange={(e) => setSearchCartUser(e.target.value)} 
-                  placeholder="Masukkan Username Roblox..." 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  placeholder="Masukkan No. WhatsApp / No. Invoice (Contoh: INV-87213)..." 
                   className="flex-1 px-4 py-2 bg-black/50 border border-white/10 rounded-xl text-xs text-white" 
                 />
-                <button onClick={() => handleSearchInvoices(searchCartUser)} className="px-4 py-2 bg-white text-black font-bold text-xs rounded-xl flex items-center gap-1">
+                <button onClick={() => handleSearchInvoices(searchQuery)} className="px-4 py-2 bg-white text-black font-bold text-xs rounded-xl flex items-center gap-1">
                   <Search className="w-3.5 h-3.5" /> Cari
                 </button>
               </div>
 
               {userInvoices.length === 0 ? (
-                <p className="text-center text-xs text-slate-500 py-8">Ketik username Roblox kamu untuk melihat riwayat pesanan.</p>
+                <p className="text-center text-xs text-slate-500 py-8">Ketik Nomor WhatsApp atau Nomor Invoice kamu di atas untuk mengecek status pesanan.</p>
               ) : (
                 userInvoices.map((inv) => (
                   <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-white">{inv.product_name}</span>
+                      <div>
+                        <span className="font-mono text-emerald-400 font-bold block">{inv.invoice_number || 'INV-0000'}</span>
+                        <span className="font-bold text-white">{inv.product_name}</span>
+                      </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 ${
                         inv.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' :
                         inv.status === 'CANCELLED' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
@@ -338,14 +383,13 @@ export default function App() {
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex justify-between">
+                    <div className="text-[11px] text-slate-400 flex justify-between pt-1">
                       <span>Total: <b className="text-white">Rp{inv.total_price?.toLocaleString('id-ID')}</b></span>
                       <span>Metode: {inv.payment_method}</span>
                     </div>
 
-                    {/* Pesan / Note Khusus Admin ke Pengguna */}
                     {inv.admin_note && (
-                      <div className="p-2.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 flex items-start gap-2">
+                      <div className="p-2.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 flex items-start gap-2 mt-2">
                         <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
                         <div>
                           <b className="block text-[10px] text-blue-300">Pesan dari Admin:</b>
