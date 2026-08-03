@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, RefreshCw } from 'lucide-react';
+import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, Archive, Eye, EyeOff } from 'lucide-react';
 
 const DEFAULT_PAYMENTS = [
-  { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false },
-  { id: 'dana', name: 'DANA Instant', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
-  { id: 'gopay', name: 'GoPay', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
-  { id: 'bca', name: 'Transfer Bank BCA', account_number: '1234567890', account_name: 'Golrox Store', qris_image: '', is_maintenance: false }
+  { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false, is_archived: false },
+  { id: 'dana', name: 'DANA Instant', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false, is_archived: false },
+  { id: 'gopay', name: 'GoPay', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false, is_archived: false },
+  { id: 'bca', name: 'Transfer Bank BCA', account_number: '1234567890', account_name: 'Golrox Store', qris_image: '', is_maintenance: false, is_archived: false }
 ];
 
 export default function AdminPanel({ onBack }) {
@@ -18,7 +18,7 @@ export default function AdminPanel({ onBack }) {
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState(DEFAULT_PAYMENTS);
 
-  // Form Product State
+  // Form State
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [baseType, setBaseType] = useState('Cola');
@@ -61,7 +61,6 @@ export default function AdminPanel({ onBack }) {
     }
   }
 
-  // Safe File Upload (Base64)
   const handleSafeFileUpload = (e, setTargetUrl) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -113,6 +112,7 @@ export default function AdminPanel({ onBack }) {
     }
   };
 
+  // Simpan Pengaturan Metode Pembayaran + RLS Fixed
   const handleSavePayment = async (payObj) => {
     const { error } = await supabase
       .from('payment_settings')
@@ -123,11 +123,12 @@ export default function AdminPanel({ onBack }) {
         account_name: payObj.account_name,
         qris_image: payObj.qris_image,
         is_maintenance: payObj.is_maintenance,
+        is_archived: payObj.is_archived,
         updated_at: new Date().toISOString()
       });
 
     if (!error) {
-      alert(`Metode Pembayaran ${payObj.name} berhasil disimpan!`);
+      alert(`Pengaturan ${payObj.name} berhasil disimpan ke Supabase!`);
       loadAdminData();
     } else {
       alert('Gagal menyimpan: ' + error.message);
@@ -311,27 +312,23 @@ export default function AdminPanel({ onBack }) {
           </div>
         )}
 
-        {/* TAB 3: PEMBAYARAN */}
+        {/* TAB 3: PENGATURAN PEMBAYARAN (WITH ARCHIVE/HIDE & MAINTENANCE) */}
         {activeTab === 'payments' && (
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN</h2>
-              <button 
-                onClick={() => {
-                  payments.forEach(p => handleSavePayment(p));
-                  alert('Semua metode pembayaran di-sync ke Supabase!');
-                }}
-                className="px-3 py-1.5 bg-blue-600 text-white font-bold text-xs rounded-xl flex items-center gap-1"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Sync ke Supabase
-              </button>
-            </div>
+            <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN</h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {payments.map((p, idx) => (
                 <div key={p.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
                     <b className="text-white text-xs uppercase">{p.name}</b>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Status: {p.is_archived ? 'Hidden' : 'Visible'}
+                    </span>
+                  </div>
+
+                  {/* Kontrol Maintenance & Archive */}
+                  <div className="flex justify-between items-center bg-slate-900/60 p-2 rounded-xl border border-white/5">
                     <label className="flex items-center gap-2 text-xs text-red-400 font-bold cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -345,31 +342,51 @@ export default function AdminPanel({ onBack }) {
                       />
                       Maintenance
                     </label>
+
+                    <label className="flex items-center gap-2 text-xs text-amber-400 font-bold cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={p.is_archived} 
+                        onChange={(e) => {
+                          const updated = [...payments];
+                          updated[idx].is_archived = e.target.checked;
+                          setPayments(updated);
+                        }} 
+                        className="w-4 h-4 accent-amber-500" 
+                      />
+                      Hide / Archive
+                    </label>
                   </div>
 
-                  <input 
-                    type="text" 
-                    placeholder="No. Rekening / E-Wallet..."
-                    value={p.account_number || ''} 
-                    onChange={(e) => {
-                      const updated = [...payments];
-                      updated[idx].account_number = e.target.value;
-                      setPayments(updated);
-                    }} 
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
-                  />
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">No. Rekening / E-Wallet</label>
+                    <input 
+                      type="text" 
+                      placeholder="No. Rekening / E-Wallet..."
+                      value={p.account_number || ''} 
+                      onChange={(e) => {
+                        const updated = [...payments];
+                        updated[idx].account_number = e.target.value;
+                        setPayments(updated);
+                      }} 
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
+                    />
+                  </div>
 
-                  <input 
-                    type="text" 
-                    placeholder="A/N Pemilik Rekening..."
-                    value={p.account_name || ''} 
-                    onChange={(e) => {
-                      const updated = [...payments];
-                      updated[idx].account_name = e.target.value;
-                      setPayments(updated);
-                    }} 
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
-                  />
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">A/N Pemilik Rekening</label>
+                    <input 
+                      type="text" 
+                      placeholder="A/N Pemilik Rekening..."
+                      value={p.account_name || ''} 
+                      onChange={(e) => {
+                        const updated = [...payments];
+                        updated[idx].account_name = e.target.value;
+                        setPayments(updated);
+                      }} 
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
+                    />
+                  </div>
 
                   {p.id === 'qris' && (
                     <div className="flex gap-2">
@@ -407,4 +424,4 @@ export default function AdminPanel({ onBack }) {
       </div>
     </div>
   );
-    }
+                                                                  }
