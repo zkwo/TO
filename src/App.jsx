@@ -185,7 +185,7 @@ export default function App() {
               Beli Item Equipment Evade Summer 2026 Murah!
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Transaksi Sat-set via Direct Trade Server, 100% legal, aman anti-ban.
+              Transaksi Sat-set via Direct Trade Server, Tanpa pihak ke ketiga, Pengerjaan manual, 100% legal, Aman & Anti-ban.
             </p>
           </div>
         </div>
