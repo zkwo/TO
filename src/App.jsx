@@ -157,9 +157,9 @@ export default function App() {
             </div>
             <div>
               <h1 className="font-onest font-bold text-lg text-white leading-none flex items-center gap-2">
-               Limitz <span className="text-[10px] bg-gradient-to-r from-slate-700 to-slate-900 text-slate-200 border border-slate-600 px-2.5 py-0.5 rounded-full font-semibold uppercase">Summer 2026</span>
+               Limitz <span className="text-[10px] bg-gradient-to-r from-slate-700 to-slate-900 text-slate-200 border border-slate-600 px-2.5 py-0.5 rounded-full font-semibold uppercase">Evade Summer 2026</span>
               </h1>
-              <p className="text-xs text-slate-400 font-sans mt-0.5">Marketplace Event Equipment Evade</p>
+              <p className="text-xs text-slate-400 font-sans mt-0.5">Marketplace Event Items</p>
             </div>
           </div>
 
