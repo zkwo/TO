@@ -17,12 +17,11 @@ import {
   AlertCircle 
 } from 'lucide-react';
 
-// Data Bawaan jika Database Supabase masih kosong
 const DEFAULT_PAYMENTS = [
-  { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false },
-  { id: 'dana', name: 'DANA Instant', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
-  { id: 'gopay', name: 'GoPay', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
-  { id: 'bca', name: 'Transfer Bank BCA', account_number: '1234567890', account_name: 'Golrox Store', qris_image: '', is_maintenance: false }
+  { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false, is_archived: false },
+  { id: 'dana', name: 'DANA Instant', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false, is_archived: false },
+  { id: 'gopay', name: 'GoPay', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false, is_archived: false },
+  { id: 'bca', name: 'Transfer Bank BCA', account_number: '1234567890', account_name: 'Golrox Store', qris_image: '', is_maintenance: false, is_archived: false }
 ];
 
 export default function App() {
@@ -32,7 +31,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
 
-  // Form Order Input
+  // Form Input
   const [robloxUsername, setRobloxUsername] = useState('');
   const [robloxPassword, setRobloxPassword] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -63,10 +62,9 @@ export default function App() {
     const { data } = await supabase.from('payment_settings').select('*');
     if (data && data.length > 0) {
       setPayments(data);
-      const activePay = data.find(p => !p.is_maintenance);
-      if (activePay) setSelectedPaymentId(activePay.id);
+      const firstActive = data.find(p => !p.is_archived && !p.is_maintenance);
+      if (firstActive) setSelectedPaymentId(firstActive.id);
     } else {
-      // Auto Sync ke Supabase jika tabel masih kosong
       setPayments(DEFAULT_PAYMENTS);
       setSelectedPaymentId('qris');
     }
@@ -92,8 +90,8 @@ export default function App() {
     }
 
     const selectedPay = payments.find(p => p.id === selectedPaymentId);
-    if (!selectedPay) {
-      alert('Silahkan pilih metode pembayaran terlebih dahulu!');
+    if (!selectedPay || selectedPay.is_archived) {
+      alert('Metode pembayaran tidak valid atau disembunyikan!');
       return;
     }
 
@@ -138,7 +136,9 @@ export default function App() {
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
-  const selectedPaymentObj = payments.find(p => p.id === selectedPaymentId);
+  // Filter hanya pembayaran yang TIDAK di-archive untuk Landing Page
+  const visiblePayments = payments.filter(p => !p.is_archived);
+  const selectedPaymentObj = visiblePayments.find(p => p.id === selectedPaymentId);
 
   return (
     <div className="pb-20 min-h-screen bg-[#08090d] text-slate-100 font-sans">
@@ -271,7 +271,7 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Data Wajib */}
+              {/* Form Input Data Wajib */}
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Username Roblox</label>
@@ -293,11 +293,11 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pilihan Metode Pembayaran Auto Load */}
+              {/* Pilihan Metode Pembayaran Aktif */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Metode Pembayaran</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {payments.map((p) => (
+                  {visiblePayments.map((p) => (
                     <button
                       key={p.id}
                       type="button"
@@ -317,7 +317,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Rincian Petunjuk Pembayaran */}
+              {/* Petunjuk Pembayaran */}
               {selectedPaymentObj && (
                 <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 text-center space-y-2">
                   <span className="text-xs text-slate-400 font-mono">Petunjuk Bayar ({selectedPaymentObj.name}):</span>
