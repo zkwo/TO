@@ -4,37 +4,41 @@ import AdminPanel from './components/AdminPanel';
 import { 
   ShoppingBag, 
   Sparkles, 
-  Zap, 
-  ShieldCheck, 
-  RefreshCw, 
-  CheckCircle2, 
   ArrowRight, 
-  X,
-  CreditCard,
-  Clock,
-  XCircle,
-  MessageSquare,
-  Search,
-  Key,
-  Phone,
-  FileText,
-  AlertCircle
+  X, 
+  Clock, 
+  CheckCircle2, 
+  XCircle, 
+  MessageSquare, 
+  Search, 
+  Key, 
+  Phone, 
+  FileText, 
+  AlertCircle 
 } from 'lucide-react';
+
+// Data Bawaan jika Database Supabase masih kosong
+const DEFAULT_PAYMENTS = [
+  { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false },
+  { id: 'dana', name: 'DANA Instant', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
+  { id: 'gopay', name: 'GoPay', account_number: '089527732022', account_name: 'Golrox Store', qris_image: '', is_maintenance: false },
+  { id: 'bca', name: 'Transfer Bank BCA', account_number: '1234567890', account_name: 'Golrox Store', qris_image: '', is_maintenance: false }
+];
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [products, setProducts] = useState([]);
-  const [payments, setPayments] = useState([]);
+  const [payments, setPayments] = useState(DEFAULT_PAYMENTS);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
 
-  // Form Order Input State
+  // Form Order Input
   const [robloxUsername, setRobloxUsername] = useState('');
   const [robloxPassword, setRobloxPassword] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [selectedPaymentId, setSelectedPaymentId] = useState('');
+  const [selectedPaymentId, setSelectedPaymentId] = useState('qris');
   
-  // Cart / Tracking State
+  // Tracking State
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userInvoices, setUserInvoices] = useState([]);
@@ -52,15 +56,19 @@ export default function App() {
 
   async function fetchProducts() {
     const { data } = await supabase.from('products').select('*').eq('is_archived', false).order('created_at', { ascending: false });
-    if (data) setProducts(data);
+    if (data && data.length > 0) setProducts(data);
   }
 
   async function fetchPaymentSettings() {
     const { data } = await supabase.from('payment_settings').select('*');
     if (data && data.length > 0) {
       setPayments(data);
-      const activeMethod = data.find(p => !p.is_maintenance);
-      if (activeMethod) setSelectedPaymentId(activeMethod.id);
+      const activePay = data.find(p => !p.is_maintenance);
+      if (activePay) setSelectedPaymentId(activePay.id);
+    } else {
+      // Auto Sync ke Supabase jika tabel masih kosong
+      setPayments(DEFAULT_PAYMENTS);
+      setSelectedPaymentId('qris');
     }
   }
 
@@ -84,8 +92,13 @@ export default function App() {
     }
 
     const selectedPay = payments.find(p => p.id === selectedPaymentId);
-    if (!selectedPay || selectedPay.is_maintenance) {
-      alert('Metode pembayaran ini sedang maintenance. Pilih metode lain!');
+    if (!selectedPay) {
+      alert('Silahkan pilih metode pembayaran terlebih dahulu!');
+      return;
+    }
+
+    if (selectedPay.is_maintenance) {
+      alert(`Metode pembayaran ${selectedPay.name} sedang maintenance. Silahkan pilih metode lain!`);
       return;
     }
 
@@ -105,7 +118,7 @@ export default function App() {
     ]);
 
     if (!error) {
-      alert(`Pesanan Berhasil dibuat!\nNomor Invoice Kamu: ${generatedInvoiceNo}\nSimpan No. Invoice atau gunakan No. WhatsApp untuk cek status.`);
+      alert(`Pesanan Berhasil dibuat!\nNomor Invoice: ${generatedInvoiceNo}\nCek status pesanan via Nomor WhatsApp atau No. Invoice.`);
       setSearchQuery(generatedInvoiceNo);
       handleSearchInvoices(generatedInvoiceNo);
       setSelectedItem(null);
@@ -199,7 +212,6 @@ export default function App() {
                   <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded">🫧 {p.tokens} Tokens</span>
                 </div>
                 
-                {/* GAMBAR FULL SEKOTAK FIT CONTAINER */}
                 <div className="w-full aspect-square rounded-xl bg-black/50 overflow-hidden mb-4 border border-white/10 relative flex items-center justify-center">
                   <img 
                     src={p.image} 
@@ -238,7 +250,6 @@ export default function App() {
             </div>
 
             <div className="py-4 space-y-4">
-              {/* Box Info Produk */}
               <div className="flex gap-4 bg-black/40 p-3 rounded-2xl border border-white/10 items-center">
                 <img src={selectedItem.image} onError={(e) => e.target.src='https://via.placeholder.com/100'} alt="" className="w-16 h-16 object-cover rounded-xl" />
                 <div>
@@ -247,7 +258,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* CATATAN PENTING DI INVOICE CHECKOUT */}
+              {/* Catatan Penting */}
               <div className="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl text-amber-200 text-xs space-y-1 font-sans">
                 <b className="font-bold text-amber-300 block flex items-center gap-1 text-[13px]">
                   <AlertCircle className="w-4 h-4 text-amber-400" /> 𝗖𝗮𝘁𝗮𝘁𝗮𝗻 𝗣𝗲𝗻𝘁𝗶𝗻𝗴:
@@ -260,49 +271,29 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Data Wajib Pembeli */}
+              {/* Data Wajib */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Username Roblox
-                  </label>
-                  <input 
-                    type="text" 
-                    value={robloxUsername} 
-                    onChange={(e) => setRobloxUsername(e.target.value)} 
-                    placeholder="Username Roblox..." 
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" 
-                  />
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Username Roblox</label>
+                  <input type="text" value={robloxUsername} onChange={(e) => setRobloxUsername(e.target.value)} placeholder="Username Roblox..." className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
                     <Key className="w-3.5 h-3.5 text-amber-400" /> Password Roblox
                   </label>
-                  <input 
-                    type="password" 
-                    value={robloxPassword} 
-                    onChange={(e) => setRobloxPassword(e.target.value)} 
-                    placeholder="Password Akun Roblox..." 
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" 
-                  />
+                  <input type="password" value={robloxPassword} onChange={(e) => setRobloxPassword(e.target.value)} placeholder="Password Akun Roblox..." className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
                     <Phone className="w-3.5 h-3.5 text-emerald-400" /> No. WhatsApp Aktif (Untuk Cek Invoice)
                   </label>
-                  <input 
-                    type="text" 
-                    value={whatsappNumber} 
-                    onChange={(e) => setWhatsappNumber(e.target.value)} 
-                    placeholder="Contoh: 089527732022" 
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" 
-                  />
+                  <input type="text" value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} placeholder="Contoh: 089527732022" className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs" />
                 </div>
               </div>
 
-              {/* Pilihan Metode Pembayaran */}
+              {/* Pilihan Metode Pembayaran Auto Load */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Metode Pembayaran</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -310,27 +301,31 @@ export default function App() {
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => !p.is_maintenance && setSelectedPaymentId(p.id)}
+                      onClick={() => setSelectedPaymentId(p.id)}
                       className={`p-2.5 rounded-xl text-left border text-xs font-bold flex flex-col justify-between transition ${
                         p.is_maintenance 
-                          ? 'opacity-40 border-red-500/30 bg-red-950/20 cursor-not-allowed'
+                          ? 'border-red-500/40 bg-red-950/20 text-red-300'
                           : selectedPaymentId === p.id 
                             ? 'border-white bg-white text-black' 
                             : 'border-white/10 bg-black/40 text-white hover:bg-white/5'
                       }`}
                     >
                       <span>{p.name}</span>
-                      {p.is_maintenance && <span className="text-[9px] text-red-400 font-normal">Maintenance</span>}
+                      {p.is_maintenance && <span className="text-[9px] text-red-400 font-normal">[Maintenance]</span>}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Petunjuk Pembayaran */}
-              {selectedPaymentObj && !selectedPaymentObj.is_maintenance && (
+              {/* Rincian Petunjuk Pembayaran */}
+              {selectedPaymentObj && (
                 <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 text-center space-y-2">
                   <span className="text-xs text-slate-400 font-mono">Petunjuk Bayar ({selectedPaymentObj.name}):</span>
-                  {selectedPaymentObj.qris_image ? (
+                  {selectedPaymentObj.is_maintenance ? (
+                    <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300">
+                      Metode pembayaran ini sedang maintenance. Silahkan pilih metode lain di atas.
+                    </div>
+                  ) : selectedPaymentObj.qris_image ? (
                     <div className="bg-white p-2 rounded-xl inline-block mx-auto">
                       <img src={selectedPaymentObj.qris_image} alt="QRIS" className="w-44 h-44 object-contain mx-auto" />
                     </div>
@@ -352,7 +347,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL CEK INVOICE PESANAN */}
+      {/* MODAL CEK INVOICE */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
           <div className="mewah-glass w-full max-w-lg rounded-3xl p-6 border border-white/20 max-h-[85vh] flex flex-col">
@@ -369,7 +364,7 @@ export default function App() {
                   type="text" 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
-                  placeholder="Masukkan No. WhatsApp / No. Invoice (INV-87213)..." 
+                  placeholder="Masukkan No. WhatsApp / No. Invoice..." 
                   className="flex-1 px-4 py-2 bg-black/50 border border-white/10 rounded-xl text-xs text-white" 
                 />
                 <button onClick={() => handleSearchInvoices(searchQuery)} className="px-4 py-2 bg-white text-black font-bold text-xs rounded-xl flex items-center gap-1">
@@ -378,7 +373,7 @@ export default function App() {
               </div>
 
               {userInvoices.length === 0 ? (
-                <p className="text-center text-xs text-slate-500 py-8">Ketik Nomor WhatsApp atau Nomor Invoice kamu di atas untuk mengecek status pesanan.</p>
+                <p className="text-center text-xs text-slate-500 py-8">Ketik Nomor WhatsApp atau Nomor Invoice di atas untuk mengecek status pesanan.</p>
               ) : (
                 userInvoices.map((inv) => (
                   <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
@@ -396,13 +391,6 @@ export default function App() {
                         {inv.status === 'PENDING' && <Clock className="w-3 h-3" />}
                         {inv.status}
                       </span>
-                    </div>
-
-                    {/* CATATAN PENTING DI SETIAP INVOICE DITAMPILKAN JUGA */}
-                    <div className="p-3 bg-amber-950/30 border border-amber-500/20 rounded-xl text-amber-200 text-[11px] leading-relaxed">
-                      <b className="font-bold text-amber-300 block mb-0.5">𝗖𝗮𝘁𝗮𝘁𝗮𝗻 𝗣𝗲𝗻𝘁𝗶𝗻𝗴:</b>
-                      Perlu diingat bahwa, Admin tidak pernah mengganti data akun semacam hb (hackback) saat setelah transaksi berhasil dan data akun ditransfer.
-                      <span className="italic text-[10px] font-serif text-amber-300 block pt-0.5">𝘩𝘢𝘱𝘱𝘺 𝘴𝘩𝘰𝘱𝘱𝘪𝘯𝘨..</span>
                     </div>
 
                     <div className="text-[11px] text-slate-400 flex justify-between pt-1">
@@ -428,4 +416,4 @@ export default function App() {
       )}
     </div>
   );
-        }
+      }
