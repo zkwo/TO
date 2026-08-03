@@ -10,121 +10,118 @@ import {
   CheckCircle2, 
   ArrowRight, 
   X,
-  CreditCard
+  CreditCard,
+  Clock,
+  XCircle,
+  MessageSquare,
+  AlertTriangle,
+  Search
 } from 'lucide-react';
 
 export default function App() {
-  const [isAdminView, setIsAdminView] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [products, setProducts] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [robloxUsername, setRobloxUsername] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('qris');
-  const [cartCount, setCartCount] = useState(0);
+  const [selectedPaymentId, setSelectedPaymentId] = useState('');
+  
+  // Modal State
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [searchCartUser, setSearchCartUser] = useState('');
+  const [userInvoices, setUserInvoices] = useState([]);
 
-  // Load produk dari Supabase saat aplikasi dimuat
+  // Routing Handler (/admin vs /)
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   useEffect(() => {
     fetchProducts();
+    fetchPaymentSettings();
   }, []);
 
   async function fetchProducts() {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_archived', false)
-      .order('created_at', { ascending: false });
+    const { data } = await supabase.from('products').select('*').eq('is_archived', false).order('created_at', { ascending: false });
+    if (data) setProducts(data);
+  }
 
+  async function fetchPaymentSettings() {
+    const { data } = await supabase.from('payment_settings').select('*');
     if (data && data.length > 0) {
-      setProducts(data);
-    } else {
-      // Fallback Data Bawaan jika Supabase masih kosong / belum diisi
-      setProducts([
-        {
-          id: 'sum-01',
-          name: 'Chilled Cola',
-          base_type: 'Cola',
-          category: 'usable',
-          tokens: 30,
-          price: 5000,
-          original_price: 10000,
-          description: 'Minuman cola dingin eksklusif Summer Event 2026. Efek lari ekstra kencang.',
-          image: 'https://static.wikia.nocookie.net/evade-nextbot/images/2/28/Chilled_Cola.jpeg/revision/latest?cb=20260718040441',
-          badge: 'BESTSELLER'
-        },
-        {
-          id: 'sum-02',
-          name: 'Shark Teleporter',
-          base_type: 'Teleporter',
-          category: 'utility',
-          tokens: 50,
-          price: 15000,
-          original_price: 22000,
-          description: 'Teleporter bermotif mulut hiu pantai. Berpindah tempat instan.',
-          image: 'https://static.wikia.nocookie.net/evade-nextbot/images/2/28/Chilled_Cola.jpeg/revision/latest?cb=20260718040441',
-          badge: 'HOT'
-        },
-        {
-          id: 'sum-12',
-          name: 'Baby Shark Flashlight',
-          base_type: 'Flashlight',
-          category: 'utility',
-          tokens: 30,
-          price: 2000,
-          original_price: 5000,
-          description: 'Senter berdesain anak hiu kecil. Pencahayaan sangat terang.',
-          image: 'https://static.wikia.nocookie.net/evade-roblox/images/d/d4/NeonLighter.png/revision/latest?cb=20230715000000',
-          badge: 'BEST DEAL'
-        }
-      ]);
+      setPayments(data);
+      const activeMethod = data.find(p => !p.is_maintenance);
+      if (activeMethod) setSelectedPaymentId(activeMethod.id);
     }
   }
 
-  // Fungsi checkout / simpan invoice ke Supabase
+  // Load Invoice untuk Modal Keranjang / Cek Status
+  async function handleSearchInvoices(username) {
+    if (!username.trim()) return;
+    const { data } = await supabase
+      .from('invoices')
+      .select('*')
+      .ilike('roblox_username', username.trim())
+      .order('created_at', { ascending: false });
+    if (data) setUserInvoices(data);
+  }
+
+  // Handle Checkout
   const handleCheckout = async () => {
     if (!robloxUsername.trim()) {
-      alert('Masukkan Username Roblox kamu terlebih dahulu!');
+      alert('Masukkan Username Roblox kamu!');
+      return;
+    }
+
+    const selectedPay = payments.find(p => p.id === selectedPaymentId);
+    if (!selectedPay || selectedPay.is_maintenance) {
+      alert('Metode pembayaran ini sedang maintenance. Pilih metode lain!');
       return;
     }
 
     const { error } = await supabase.from('invoices').insert([
       {
-        roblox_username: robloxUsername,
+        roblox_username: robloxUsername.trim(),
         product_name: selectedItem.name,
         total_price: selectedItem.price,
-        payment_method: paymentMethod,
+        payment_method: selectedPay.name,
         status: 'PENDING'
       }
     ]);
 
     if (!error) {
-      setCartCount(cartCount + 1);
-      alert(`Pesanan ${selectedItem.name} berhasil dibuat! Admin/Bot akan segera memproses ke akun Roblox: ${robloxUsername}.`);
+      alert(`Pesanan ${selectedItem.name} berhasil dibuat! Kamu bisa cek status di menu Keranjang.`);
+      setSearchCartUser(robloxUsername);
+      handleSearchInvoices(robloxUsername);
       setSelectedItem(null);
-      setRobloxUsername('');
+      setIsCartOpen(true); // Otomatis buka modal keranjang
     } else {
-      alert('Gagal membuat pesanan: ' + error.message);
+      alert('Gagal checkout: ' + error.message);
     }
   };
 
-  // Render Panel Admin jika tombol dipencet
-  if (isAdminView) {
-    return <AdminPanel onBack={() => setIsAdminView(false)} />;
+  // 🔒 Halaman Admin Panel jika URL: domain.com/admin
+  if (currentPath === '/admin') {
+    return <AdminPanel onBack={() => { window.history.pushState({}, '', '/'); setCurrentPath('/'); }} />;
   }
 
-  // Filter kategori produk (All / Usable / Utility)
   const filteredProducts = selectedCategory === 'all' 
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
+  const selectedPaymentObj = payments.find(p => p.id === selectedPaymentId);
+
   return (
-    <div className="pb-20">
-      {/* Dynamic Animated Glowing Background */}
+    <div className="pb-20 min-h-screen bg-[#08090d] text-slate-100 font-sans">
       <div className="animated-bg">
         <div className="orb orb-1 animate-float-1"></div>
         <div className="orb orb-2 animate-float-2"></div>
       </div>
 
-      {/* Header / Navbar */}
+      {/* Header / Navbar (TIDAK ADA TOMBOL ADMIN) */}
       <header className="sticky top-0 z-50 mewah-glass border-b border-white/10 px-4 lg:px-8 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -141,14 +138,11 @@ export default function App() {
 
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => setIsAdminView(true)} 
-              className="px-3 py-1.5 text-xs bg-white/10 border border-white/10 rounded-xl hover:bg-white hover:text-black transition"
+              onClick={() => setIsCartOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-slate-100 to-white hover:brightness-110 rounded-xl shadow-md transition"
             >
-              Panel Admin
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-slate-100 to-white rounded-xl shadow-md">
               <ShoppingBag className="w-4 h-4 text-slate-900" />
-              <span className="bg-slate-950 text-white px-2 py-0.5 rounded-full text-[10px]">{cartCount}</span>
+              <span>Cek Pesanan</span>
             </button>
           </div>
         </div>
@@ -166,66 +160,44 @@ export default function App() {
               Beli Item Event Evade Summer 2026 Murah!
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Transaksi kilat via Direct Trade Server, 100% legal, aman anti-ban dengan harga mulai dari <span className="text-emerald-400 font-bold">Rp2.000 - Rp50.000</span>.
+              Transaksi kilat via Direct Trade Server, 100% legal, aman anti-ban dengan harga terjangkau.
             </p>
-            
-            <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-slate-300">
-              <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
-                <Zap className="w-3.5 h-3.5 text-amber-400" /> Proses 1-3 Menit
-              </span>
-              <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Garansi Item Masuk
-              </span>
-              <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
-                <RefreshCw className="w-3.5 h-3.5 text-cyan-400" /> Auto Sync Supabase
-              </span>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Catalog */}
+      {/* Katalog Produk */}
       <section className="max-w-7xl mx-auto px-4 lg:px-8 mt-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="font-onest font-black text-2xl text-white tracking-wide">
-            Katalog Item Evade Summer 2026
+            Katalog Item Evade
           </h2>
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-            <button 
-              onClick={() => setSelectedCategory('all')} 
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${selectedCategory === 'all' ? 'bg-white text-slate-950 shadow-lg' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
-            >
-              Semua Item
-            </button>
-            <button 
-              onClick={() => setSelectedCategory('usable')} 
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${selectedCategory === 'usable' ? 'bg-white text-slate-950 shadow-lg' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
-            >
-              Usables / Consumables
-            </button>
-            <button 
-              onClick={() => setSelectedCategory('utility')} 
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${selectedCategory === 'utility' ? 'bg-white text-slate-950 shadow-lg' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
-            >
-              Utilities & Sensors
-            </button>
+          <div className="flex gap-2">
+            <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-xl text-xs font-bold ${selectedCategory === 'all' ? 'bg-white text-slate-950' : 'bg-white/5 text-slate-300'}`}>Semua</button>
+            <button onClick={() => setSelectedCategory('usable')} className={`px-4 py-2 rounded-xl text-xs font-bold ${selectedCategory === 'usable' ? 'bg-white text-slate-950' : 'bg-white/5 text-slate-300'}`}>Usable</button>
+            <button onClick={() => setSelectedCategory('utility')} className={`px-4 py-2 rounded-xl text-xs font-bold ${selectedCategory === 'utility' ? 'bg-white text-slate-950' : 'bg-white/5 text-slate-300'}`}>Utility</button>
           </div>
         </div>
 
-        {/* Product Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredProducts.map((p) => (
             <div key={p.id} className="mewah-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/10 text-white uppercase tracking-wider">{p.badge}</span>
-                  <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800">🫧 {p.tokens} Tokens</span>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/10 text-white uppercase">{p.badge}</span>
+                  <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded">🫧 {p.tokens} Tokens</span>
                 </div>
-                <div className="w-full aspect-square rounded-xl bg-black/40 flex items-center justify-center p-3 mb-4 border border-white/5">
-                  <img src={p.image} alt={p.name} className="w-24 h-24 object-contain drop-shadow" />
+                {/* Fallback Gambar jika Link Error */}
+                <div className="w-full aspect-square rounded-xl bg-black/40 flex items-center justify-center p-3 mb-4 overflow-hidden">
+                  <img 
+                    src={p.image} 
+                    alt={p.name} 
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/200?text=No+Image'; }}
+                    className="w-24 h-24 object-contain drop-shadow" 
+                  />
                 </div>
                 <h3 className="font-onest font-bold text-white text-base">{p.name}</h3>
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{p.description}</p>
+                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{p.description}</p>
               </div>
 
               <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
@@ -233,10 +205,7 @@ export default function App() {
                   <span className="text-[10px] line-through text-slate-500 block">Rp{p.original_price?.toLocaleString('id-ID')}</span>
                   <span className="text-base font-black text-white">Rp{p.price?.toLocaleString('id-ID')}</span>
                 </div>
-                <button 
-                  onClick={() => setSelectedItem(p)} 
-                  className="px-3.5 py-2 rounded-xl bg-white text-slate-950 font-bold text-xs hover:bg-slate-200 transition flex items-center gap-1 shadow-[0_0_10px_rgba(255,255,255,0.2)]"
-                >
+                <button onClick={() => setSelectedItem(p)} className="px-3.5 py-2 rounded-xl bg-white text-slate-950 font-bold text-xs flex items-center gap-1">
                   <span>Beli</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
@@ -246,91 +215,151 @@ export default function App() {
         </div>
       </section>
 
-      {/* Checkout Payment Modal */}
+      {/* MODAL CHECKOUT & PAYMENT */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
-          <div className="mewah-glass w-full max-w-md rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 overflow-y-auto">
+          <div className="mewah-glass w-full max-w-md rounded-3xl p-6 border border-white/20 my-8">
             <div className="flex justify-between items-center pb-4 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-white" />
-                <h3 className="font-onest font-bold text-white text-base">Detail Pesanan Topup</h3>
-              </div>
-              <button onClick={() => setSelectedItem(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+              <h3 className="font-onest font-bold text-white text-base">Detail Pesanan & Pembayaran</h3>
+              <button onClick={() => setSelectedItem(null)}><X className="w-5 h-5 text-slate-400" /></button>
             </div>
 
             <div className="py-4 space-y-4">
-              {/* Item Card Ringkas */}
               <div className="flex gap-4 bg-black/40 p-3 rounded-2xl border border-white/10 items-center">
-                <div className="w-14 h-14 rounded-xl bg-black/60 p-2 border border-white/10 flex items-center justify-center flex-shrink-0">
-                  <img src={selectedItem.image} alt="" className="w-full h-full object-contain" />
-                </div>
+                <img src={selectedItem.image} onError={(e) => e.target.src='https://via.placeholder.com/100'} alt="" className="w-12 h-12 object-contain" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-white text-sm">{selectedItem.name}</h4>
-                    <span className="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded font-bold">{selectedItem.tokens} Tokens</span>
-                  </div>
-                  <span className="text-sm font-black text-emerald-400 block mt-0.5">Rp{selectedItem.price?.toLocaleString('id-ID')}</span>
+                  <h4 className="font-bold text-white text-sm">{selectedItem.name}</h4>
+                  <span className="text-sm font-black text-emerald-400">Rp{selectedItem.price?.toLocaleString('id-ID')}</span>
                 </div>
               </div>
 
-              {/* Input Username */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Username Roblox (Harus Akurat)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Username Roblox</label>
                 <input 
                   type="text" 
                   value={robloxUsername} 
                   onChange={(e) => setRobloxUsername(e.target.value)} 
-                  placeholder="Masukkan Username Roblox kamu..." 
-                  className="w-full px-4 py-3 rounded-xl border border-white/15 bg-black/50 text-white placeholder:text-slate-600 text-xs font-medium focus:outline-none focus:border-white transition" 
+                  placeholder="Username Roblox kamu..." 
+                  className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-black/50 text-white text-xs focus:outline-none focus:border-white" 
                 />
               </div>
 
-              {/* Select Payment Method */}
+              {/* Pilihan Pembayaran + Maintenance Check */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Metode Pembayaran</label>
-                <select 
-                  value={paymentMethod} 
-                  onChange={(e) => setPaymentMethod(e.target.value)} 
-                  className="w-full px-4 py-3 rounded-xl border border-white/15 bg-slate-900 text-white text-xs font-medium focus:outline-none focus:border-white transition"
-                >
-                  <option value="qris">QRIS All Payment (Bebas Admin)</option>
-                  <option value="dana">DANA Instant</option>
-                  <option value="gopay">GoPay</option>
-                  <option value="shopeepay">ShopeePay</option>
-                  <option value="bca">Transfer Bank BCA</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Metode Pembayaran</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {payments.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => !p.is_maintenance && setSelectedPaymentId(p.id)}
+                      className={`p-2.5 rounded-xl text-left border text-xs font-bold flex flex-col justify-between transition ${
+                        p.is_maintenance 
+                          ? 'opacity-40 border-red-500/30 bg-red-950/20 cursor-not-allowed'
+                          : selectedPaymentId === p.id 
+                            ? 'border-white bg-white text-black' 
+                            : 'border-white/10 bg-black/40 text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span>{p.name}</span>
+                      {p.is_maintenance && <span className="text-[9px] text-red-400 font-normal">Maintenance</span>}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Detail Rincian Biaya */}
-              <div className="border-t border-white/10 pt-3 space-y-1.5 text-xs">
-                <div className="flex justify-between text-slate-400">
-                  <span>Harga Item</span>
-                  <span>Rp{selectedItem.price?.toLocaleString('id-ID')}</span>
+              {/* Rincian QRIS / Nomor Rekening */}
+              {selectedPaymentObj && !selectedPaymentObj.is_maintenance && (
+                <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 text-center space-y-2">
+                  <span className="text-xs text-slate-400 font-mono">Petunjuk Bayar ({selectedPaymentObj.name}):</span>
+                  
+                  {selectedPaymentObj.qris_image ? (
+                    <div className="bg-white p-2 rounded-xl inline-block mx-auto">
+                      <img src={selectedPaymentObj.qris_image} alt="QRIS" className="w-44 h-44 object-contain mx-auto" />
+                    </div>
+                  ) : (
+                    <div className="bg-black/50 p-3 rounded-xl border border-white/10">
+                      <p className="text-xs text-slate-400">Nomor Rekening / E-Wallet:</p>
+                      <p className="text-base font-mono font-bold text-emerald-400 select-all">{selectedPaymentObj.account_number}</p>
+                      <p className="text-[11px] text-slate-300">A/N: {selectedPaymentObj.account_name}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>Biaya Layanan/Admin</span>
-                  <span className="text-emerald-400 font-semibold">GRATIS</span>
-                </div>
-                <div className="flex justify-between font-extrabold text-sm text-white pt-2 border-t border-dashed border-white/10">
-                  <span>Total Pembayaran</span>
-                  <span className="text-emerald-400">Rp{selectedItem.price?.toLocaleString('id-ID')}</span>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Submit Button */}
-            <button 
-              onClick={handleCheckout} 
-              className="w-full py-3.5 bg-gradient-to-r from-slate-100 via-slate-200 to-white hover:brightness-110 text-slate-950 font-onest font-black text-xs rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.3)] transition active:scale-95 flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4 text-slate-900" />
-              <span>BAYAR SEKARANG (PROSES OTOMATIS)</span>
+            <button onClick={handleCheckout} className="w-full py-3 bg-white text-slate-950 font-black text-xs rounded-xl shadow-lg">
+              KONFIRMASI PESANAN
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KERANJANG / CEK STATUS PESANAN PENGGUNA */}
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+          <div className="mewah-glass w-full max-w-lg rounded-3xl p-6 border border-white/20 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center pb-4 border-b border-white/10">
+              <h3 className="font-onest font-bold text-white text-base flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5" /> Status Pesanan Kamu
+              </h3>
+              <button onClick={() => setIsCartOpen(false)}><X className="w-5 h-5 text-slate-400" /></button>
+            </div>
+
+            <div className="py-4 space-y-4 flex-1 overflow-y-auto">
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={searchCartUser} 
+                  onChange={(e) => setSearchCartUser(e.target.value)} 
+                  placeholder="Masukkan Username Roblox..." 
+                  className="flex-1 px-4 py-2 bg-black/50 border border-white/10 rounded-xl text-xs text-white" 
+                />
+                <button onClick={() => handleSearchInvoices(searchCartUser)} className="px-4 py-2 bg-white text-black font-bold text-xs rounded-xl flex items-center gap-1">
+                  <Search className="w-3.5 h-3.5" /> Cari
+                </button>
+              </div>
+
+              {userInvoices.length === 0 ? (
+                <p className="text-center text-xs text-slate-500 py-8">Ketik username Roblox kamu untuk melihat riwayat pesanan.</p>
+              ) : (
+                userInvoices.map((inv) => (
+                  <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-white">{inv.product_name}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 ${
+                        inv.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' :
+                        inv.status === 'CANCELLED' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {inv.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
+                        {inv.status === 'CANCELLED' && <XCircle className="w-3 h-3" />}
+                        {inv.status === 'PENDING' && <Clock className="w-3 h-3" />}
+                        {inv.status}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 flex justify-between">
+                      <span>Total: <b className="text-white">Rp{inv.total_price?.toLocaleString('id-ID')}</b></span>
+                      <span>Metode: {inv.payment_method}</span>
+                    </div>
+
+                    {/* Pesan / Note Khusus Admin ke Pengguna */}
+                    {inv.admin_note && (
+                      <div className="p-2.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 flex items-start gap-2">
+                        <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <b className="block text-[10px] text-blue-300">Pesan dari Admin:</b>
+                          {inv.admin_note}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-}
+        }
