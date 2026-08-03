@@ -17,7 +17,8 @@ import {
   Search,
   Key,
   Phone,
-  FileText
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 
 export default function App() {
@@ -35,7 +36,7 @@ export default function App() {
   
   // Cart / Tracking State
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // No WA atau No Invoice
+  const [searchQuery, setSearchQuery] = useState('');
   const [userInvoices, setUserInvoices] = useState([]);
 
   useEffect(() => {
@@ -63,7 +64,6 @@ export default function App() {
     }
   }
 
-  // Cari Invoice menggunakan No WhatsApp ATAU No Invoice
   async function handleSearchInvoices(query) {
     if (!query.trim()) return;
     const cleanQuery = query.trim();
@@ -77,7 +77,6 @@ export default function App() {
     if (data) setUserInvoices(data);
   }
 
-  // Handle Checkout
   const handleCheckout = async () => {
     if (!robloxUsername.trim() || !robloxPassword.trim() || !whatsappNumber.trim()) {
       alert('Wajib mengisi Username Roblox, Password Roblox, dan Nomor WhatsApp aktif!');
@@ -90,7 +89,6 @@ export default function App() {
       return;
     }
 
-    // Generate Nomor Invoice Unik (misal: INV-87213)
     const generatedInvoiceNo = 'INV-' + Math.floor(10000 + Math.random() * 90000);
 
     const { error } = await supabase.from('invoices').insert([
@@ -179,7 +177,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* Katalog */}
+      {/* Katalog Produk */}
       <section className="max-w-7xl mx-auto px-4 lg:px-8 mt-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="font-onest font-black text-2xl text-white tracking-wide">
@@ -200,14 +198,17 @@ export default function App() {
                   <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/10 text-white uppercase">{p.badge}</span>
                   <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded">🫧 {p.tokens} Tokens</span>
                 </div>
-                <div className="w-full aspect-square rounded-xl bg-black/40 flex items-center justify-center p-3 mb-4 overflow-hidden">
+                
+                {/* GAMBAR FULL SEKOTAK FIT CONTAINER */}
+                <div className="w-full aspect-square rounded-xl bg-black/50 overflow-hidden mb-4 border border-white/10 relative flex items-center justify-center">
                   <img 
                     src={p.image} 
                     alt={p.name} 
-                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/200?text=No+Image'; }}
-                    className="w-24 h-24 object-contain drop-shadow" 
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400?text=No+Image'; }}
+                    className="w-full h-full object-cover rounded-xl transition-transform duration-300 hover:scale-105" 
                   />
                 </div>
+
                 <h3 className="font-onest font-bold text-white text-base">{p.name}</h3>
                 <p className="text-xs text-slate-400 mt-1 line-clamp-2">{p.description}</p>
               </div>
@@ -237,18 +238,32 @@ export default function App() {
             </div>
 
             <div className="py-4 space-y-4">
+              {/* Box Info Produk */}
               <div className="flex gap-4 bg-black/40 p-3 rounded-2xl border border-white/10 items-center">
-                <img src={selectedItem.image} onError={(e) => e.target.src='https://via.placeholder.com/100'} alt="" className="w-12 h-12 object-contain" />
+                <img src={selectedItem.image} onError={(e) => e.target.src='https://via.placeholder.com/100'} alt="" className="w-16 h-16 object-cover rounded-xl" />
                 <div>
                   <h4 className="font-bold text-white text-sm">{selectedItem.name}</h4>
                   <span className="text-sm font-black text-emerald-400">Rp{selectedItem.price?.toLocaleString('id-ID')}</span>
                 </div>
               </div>
 
+              {/* CATATAN PENTING DI INVOICE CHECKOUT */}
+              <div className="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl text-amber-200 text-xs space-y-1 font-sans">
+                <b className="font-bold text-amber-300 block flex items-center gap-1 text-[13px]">
+                  <AlertCircle className="w-4 h-4 text-amber-400" /> 𝗖𝗮𝘁𝗮𝘁𝗮𝗻 𝗣𝗲𝗻𝘁𝗶𝗻𝗴:
+                </b>
+                <p className="text-[11px] text-amber-100/90 leading-relaxed">
+                  Perlu diingat bahwa, Admin tidak pernah mengganti data akun semacam hb (hackback) saat setelah transaksi berhasil dan data akun ditransfer.
+                </p>
+                <span className="italic text-[11px] font-serif text-amber-300 block pt-1">
+                  𝘩𝘢𝘱𝘱𝘺 𝘴𝘩𝘰𝘱𝘱𝘪𝘯𝘨..
+                </span>
+              </div>
+
               {/* Data Wajib Pembeli */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Username Roblox
                   </label>
                   <input 
@@ -311,7 +326,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Rincian Petunjuk Pembayaran */}
+              {/* Petunjuk Pembayaran */}
               {selectedPaymentObj && !selectedPaymentObj.is_maintenance && (
                 <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 text-center space-y-2">
                   <span className="text-xs text-slate-400 font-mono">Petunjuk Bayar ({selectedPaymentObj.name}):</span>
@@ -337,7 +352,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL CEK INVOICE (VIA NO WHATSAPP ATAU NO INVOICE) */}
+      {/* MODAL CEK INVOICE PESANAN */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
           <div className="mewah-glass w-full max-w-lg rounded-3xl p-6 border border-white/20 max-h-[85vh] flex flex-col">
@@ -354,7 +369,7 @@ export default function App() {
                   type="text" 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
-                  placeholder="Masukkan No. WhatsApp / No. Invoice (Contoh: INV-87213)..." 
+                  placeholder="Masukkan No. WhatsApp / No. Invoice (INV-87213)..." 
                   className="flex-1 px-4 py-2 bg-black/50 border border-white/10 rounded-xl text-xs text-white" 
                 />
                 <button onClick={() => handleSearchInvoices(searchQuery)} className="px-4 py-2 bg-white text-black font-bold text-xs rounded-xl flex items-center gap-1">
@@ -366,11 +381,11 @@ export default function App() {
                 <p className="text-center text-xs text-slate-500 py-8">Ketik Nomor WhatsApp atau Nomor Invoice kamu di atas untuk mengecek status pesanan.</p>
               ) : (
                 userInvoices.map((inv) => (
-                  <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-2">
+                  <div key={inv.id} className="p-4 bg-black/40 border border-white/10 rounded-2xl space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <div>
                         <span className="font-mono text-emerald-400 font-bold block">{inv.invoice_number || 'INV-0000'}</span>
-                        <span className="font-bold text-white">{inv.product_name}</span>
+                        <span className="font-bold text-white text-sm">{inv.product_name}</span>
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 ${
                         inv.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' :
@@ -381,6 +396,13 @@ export default function App() {
                         {inv.status === 'PENDING' && <Clock className="w-3 h-3" />}
                         {inv.status}
                       </span>
+                    </div>
+
+                    {/* CATATAN PENTING DI SETIAP INVOICE DITAMPILKAN JUGA */}
+                    <div className="p-3 bg-amber-950/30 border border-amber-500/20 rounded-xl text-amber-200 text-[11px] leading-relaxed">
+                      <b className="font-bold text-amber-300 block mb-0.5">𝗖𝗮𝘁𝗮𝘁𝗮𝗻 𝗣𝗲𝗻𝘁𝗶𝗻𝗴:</b>
+                      Perlu diingat bahwa, Admin tidak pernah mengganti data akun semacam hb (hackback) saat setelah transaksi berhasil dan data akun ditransfer.
+                      <span className="italic text-[10px] font-serif text-amber-300 block pt-0.5">𝘩𝘢𝘱𝘱𝘺 𝘴𝘩𝘰𝘱𝘱𝘪𝘯𝘨..</span>
                     </div>
 
                     <div className="text-[11px] text-slate-400 flex justify-between pt-1">
