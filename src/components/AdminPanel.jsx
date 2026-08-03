@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, Archive, Eye, EyeOff } from 'lucide-react';
+import { ShoppingBag, Receipt, LogOut, CreditCard, Upload, Check, X, RefreshCw, Bell } from 'lucide-react';
 
 const DEFAULT_PAYMENTS = [
   { id: 'qris', name: 'QRIS All Payment', account_number: '-', account_name: 'Golrox Store', qris_image: 'https://via.placeholder.com/300?text=QRIS+CODE', is_maintenance: false, is_archived: false },
@@ -17,6 +17,7 @@ export default function AdminPanel({ onBack }) {
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState(DEFAULT_PAYMENTS);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Form State
   const [editingId, setEditingId] = useState(null);
@@ -42,6 +43,7 @@ export default function AdminPanel({ onBack }) {
   };
 
   async function loadAdminData() {
+    setIsRefreshing(true);
     const { data: prod } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (prod) setProducts(prod);
 
@@ -54,11 +56,8 @@ export default function AdminPanel({ onBack }) {
     }
 
     const { data: pay } = await supabase.from('payment_settings').select('*');
-    if (pay && pay.length > 0) {
-      setPayments(pay);
-    } else {
-      setPayments(DEFAULT_PAYMENTS);
-    }
+    if (pay && pay.length > 0) setPayments(pay);
+    setIsRefreshing(false);
   }
 
   const handleSafeFileUpload = (e, setTargetUrl) => {
@@ -97,6 +96,7 @@ export default function AdminPanel({ onBack }) {
     loadAdminData();
   };
 
+  // TANDAI SELESAI / BATAL DENGAN REALTIME RE-FETCH
   const handleUpdateInvoice = async (id, status) => {
     const noteText = notes[id] || '';
     const { error } = await supabase
@@ -105,14 +105,13 @@ export default function AdminPanel({ onBack }) {
       .eq('id', id);
 
     if (!error) {
-      alert(`Status pesanan berhasil diubah ke ${status}!`);
+      alert(`Status invoice berhasil diubah menjadi ${status}!`);
       loadAdminData();
     } else {
-      alert('Gagal update invoice: ' + error.message);
+      alert('Gagal update status: ' + error.message);
     }
   };
 
-  // Simpan Pengaturan Metode Pembayaran + RLS Fixed
   const handleSavePayment = async (payObj) => {
     const { error } = await supabase
       .from('payment_settings')
@@ -128,7 +127,7 @@ export default function AdminPanel({ onBack }) {
       });
 
     if (!error) {
-      alert(`Pengaturan ${payObj.name} berhasil disimpan ke Supabase!`);
+      alert(`Pengaturan ${payObj.name} disimpan!`);
       loadAdminData();
     } else {
       alert('Gagal menyimpan: ' + error.message);
@@ -141,6 +140,9 @@ export default function AdminPanel({ onBack }) {
     setImageUrl('');
     setDescription('');
   };
+
+  // Total Notifikasi Pesanan Masuk (PENDING)
+  const pendingCount = invoices.filter(i => i.status === 'PENDING').length;
 
   if (!isAuthenticated) {
     return (
@@ -170,18 +172,32 @@ export default function AdminPanel({ onBack }) {
             <h1 className="font-onest font-bold text-xl text-white">ADMIN PANEL — ZHENS STORE</h1>
             <p className="text-xs text-slate-400">URL Akses: /admin</p>
           </div>
-          <button onClick={onBack} className="px-5 py-2 rounded-full border border-white/20 text-xs text-slate-300 hover:bg-white hover:text-black transition flex items-center gap-2">
-            <LogOut className="w-3.5 h-3.5" /> KELUAR
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Tombol Refresh Sistem Tanpa Logout */}
+            <button 
+              onClick={loadAdminData} 
+              className={`px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-full flex items-center gap-1.5 transition ${isRefreshing ? 'animate-spin' : ''}`}
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh Data
+            </button>
+            <button onClick={onBack} className="px-5 py-2 rounded-full border border-white/20 text-xs text-slate-300 hover:bg-white hover:text-black transition flex items-center gap-2">
+              <LogOut className="w-3.5 h-3.5" /> KELUAR
+            </button>
+          </div>
         </div>
 
-        {/* Tab Menu */}
+        {/* Tab Menu + Lencana Notifikasi Pesanan Masuk */}
         <div className="flex gap-2 border-b border-white/10 pb-4 overflow-x-auto">
           <button onClick={() => setActiveTab('products')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'products' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
             <ShoppingBag className="w-4 h-4 inline mr-1" /> Kelola Produk
           </button>
-          <button onClick={() => setActiveTab('invoices')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'invoices' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
+          <button onClick={() => setActiveTab('invoices')} className={`px-5 py-2.5 rounded-full text-xs font-bold relative ${activeTab === 'invoices' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
             <Receipt className="w-4 h-4 inline mr-1" /> Invoice & Data User
+            {pendingCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full animate-bounce">
+                {pendingCount}
+              </span>
+            )}
           </button>
           <button onClick={() => setActiveTab('payments')} className={`px-5 py-2.5 rounded-full text-xs font-bold ${activeTab === 'payments' ? 'bg-white text-black' : 'bg-white/5 text-slate-400'}`}>
             <CreditCard className="w-4 h-4 inline mr-1" /> Pengaturan Pembayaran
@@ -255,10 +271,10 @@ export default function AdminPanel({ onBack }) {
           </div>
         )}
 
-        {/* TAB 2: INVOICE & DATA LOGIN PEMBELI */}
+        {/* TAB 2: INVOICE & PROSES STATUS PESANAN */}
         {activeTab === 'invoices' && (
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 overflow-x-auto space-y-4">
-            <h2 className="font-bold text-sm text-white">DAFTAR INVOICE & AKUN PEMBELI</h2>
+            <h2 className="font-bold text-sm text-white">DAFTAR INVOICE & DATA LOGIN PEMBELI</h2>
             <div className="space-y-4">
               {invoices.length === 0 ? (
                 <p className="text-xs text-slate-500 text-center py-6">Belum ada pesanan masuk.</p>
@@ -271,7 +287,12 @@ export default function AdminPanel({ onBack }) {
                         <b className="text-white text-sm block mt-1">Item: {inv.product_name} (Rp{inv.total_price?.toLocaleString('id-ID')})</b>
                         <span className="text-slate-400">Metode Bayar: {inv.payment_method}</span>
                       </div>
-                      <span className="font-bold uppercase text-amber-400 bg-amber-950/40 border border-amber-800 px-3 py-1 rounded-full">{inv.status}</span>
+                      <span className={`font-bold uppercase px-3 py-1 rounded-full text-[10px] ${
+                        inv.status === 'COMPLETED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                        inv.status === 'CANCELLED' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-amber-950 text-amber-400 border border-amber-800'
+                      }`}>
+                        {inv.status}
+                      </span>
                     </div>
 
                     <div className="p-3 bg-slate-900/80 rounded-xl border border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
@@ -291,18 +312,18 @@ export default function AdminPanel({ onBack }) {
 
                     <input 
                       type="text" 
-                      placeholder="Tulis note khusus untuk pembeli..." 
+                      placeholder="Tulis pesan/note khusus untuk pembeli..." 
                       value={notes[inv.id] || ''} 
                       onChange={(e) => setNotes({ ...notes, [inv.id]: e.target.value })}
                       className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-white" 
                     />
 
                     <div className="flex justify-end gap-2 pt-2">
-                      <button onClick={() => handleUpdateInvoice(inv.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl flex items-center gap-1">
-                        <Check className="w-4 h-4" /> Tandai Selesai
+                      <button onClick={() => handleUpdateInvoice(inv.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl flex items-center gap-1">
+                        <Check className="w-4 h-4" /> Tandai Selesai (Sukses)
                       </button>
-                      <button onClick={() => handleUpdateInvoice(inv.id, 'CANCELLED')} className="px-4 py-2 bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1">
-                        <X className="w-4 h-4" /> Batalkan
+                      <button onClick={() => handleUpdateInvoice(inv.id, 'CANCELLED')} className="px-4 py-2 bg-red-500 hover:bg-red-400 text-white font-bold text-xs rounded-xl flex items-center gap-1">
+                        <X className="w-4 h-4" /> Batalkan Pesanan
                       </button>
                     </div>
                   </div>
@@ -312,7 +333,7 @@ export default function AdminPanel({ onBack }) {
           </div>
         )}
 
-        {/* TAB 3: PENGATURAN PEMBAYARAN (WITH ARCHIVE/HIDE & MAINTENANCE) */}
+        {/* TAB 3: PEMBAYARAN */}
         {activeTab === 'payments' && (
           <div className="mewah-glass rounded-2xl p-6 border border-white/10 space-y-6">
             <h2 className="font-bold text-sm text-white">PENGATURAN METODE PEMBAYARAN</h2>
@@ -327,7 +348,6 @@ export default function AdminPanel({ onBack }) {
                     </span>
                   </div>
 
-                  {/* Kontrol Maintenance & Archive */}
                   <div className="flex justify-between items-center bg-slate-900/60 p-2 rounded-xl border border-white/5">
                     <label className="flex items-center gap-2 text-xs text-red-400 font-bold cursor-pointer">
                       <input 
@@ -362,7 +382,6 @@ export default function AdminPanel({ onBack }) {
                     <label className="block text-[10px] text-slate-400 mb-0.5">No. Rekening / E-Wallet</label>
                     <input 
                       type="text" 
-                      placeholder="No. Rekening / E-Wallet..."
                       value={p.account_number || ''} 
                       onChange={(e) => {
                         const updated = [...payments];
@@ -377,7 +396,6 @@ export default function AdminPanel({ onBack }) {
                     <label className="block text-[10px] text-slate-400 mb-0.5">A/N Pemilik Rekening</label>
                     <input 
                       type="text" 
-                      placeholder="A/N Pemilik Rekening..."
                       value={p.account_name || ''} 
                       onChange={(e) => {
                         const updated = [...payments];
@@ -424,4 +442,4 @@ export default function AdminPanel({ onBack }) {
       </div>
     </div>
   );
-                                                                  }
+         }
